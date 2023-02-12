@@ -24,20 +24,29 @@ della coda.
 #include "queue.h"  				//la coda è implementata tramite array di interi e può contenere 128 elementi
 
 #define abort(msg) do{printf(msg); exit(1);}while(0)
-#define P 10
+#define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
+
+#define P 2
 #define C 10
 #define SECONDS 10
 #define QUEUE_LENGTH 128
 
 QUEUE* coda;
 pthread_mutex_t pmutex;
+pthread_barrier_t pbarrier;
 //srand(time(NULL));
 volatile unsigned contatore_prod = 0;
 
 void* prod_enqueue(void* arg);
 void* cons_dequeue(void* arg);
-void acquire(){pthread_mutex_lock(&pmutex);}
-void release(){pthread_mutex_unlock(&pmutex);}
+void acquire(){
+	pthread_mutex_lock(&pmutex);
+	printf("tid = %lu lock acquisito\n", pthread_self());
+}
+void release(){
+	pthread_mutex_unlock(&pmutex);
+	printf("tid = %lu lock rilasciato\n", pthread_self());
+}
 
 int main(int argc, char* argv[]){
 	/*creo una coda vuota*/
@@ -57,36 +66,44 @@ int main(int argc, char* argv[]){
 	//{
 		/*prima fase*/
 		printf("Inizio della prima fase, procedo a creare i thread produttori\n");
+		pthread_barrier_init(&pbarrier, NULL, P);
 		if(!prod_creati){
 			for(int i = 0; i < P; i++) {
-				if(!(pthread_create(prod + i, NULL, prod_enqueue, NULL)))
-					abort("errore nella creazione dei thread \n");
+				int res = pthread_create(prod + i, NULL, prod_enqueue, NULL);
+				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
 			}
 			prod_creati = 1;
-			sleep(SECONDS);
 		}
 
+		sleep(SECONDS);
+
 		for(int i = 0; i < P; i++){
-			if(!(pthread_join(prod[i], NULL)))
-				abort("errore nella terminazione dei thread\n");
+			int res = pthread_join(prod[i], NULL);
+			if(res != 0) abort_arg("errore nella terminazione dei thread, errore = %d\n",res);
 			prod_creati = 0;
 		}
 
-		for(int i = 0; i < QUEUE_LENGTH; i++) printf("intero pos.%d = %d",i, coda->elementi[i]);
+		pthread_barrier_destroy(&pbarrier);
+
+		for(int i = 0; i < QUEUE_LENGTH; i++) printf("intero pos.%d = %d\n",i, coda->elementi[i]);
 	//}
 }
 
 void* prod_enqueue(void* arg){
+
+	printf("tid = %lu in attesa della barrier\n",pthread_self());
+	pthread_barrier_wait(&pbarrier);
 	
 	while(contatore_prod < C){
 		int random = rand() % 1000 + 1;
-		printf("tid = %lu; sono il thread figlio in attesa del lock\n", pthread_self());
+		printf("tid = %lu in attesa del lock\n", pthread_self());
 		acquire();
 		enqueue(coda, random);
+		printf("tid = %lu ho messo in coda il numero %d\n", pthread_self(), random);
 		__sync_fetch_and_add(&contatore_prod, 1);
-		printf("tid=%lu; sono il thread figlio e ho messo in coda il numero %d\n", pthread_self(), random);
+		printf("__sync_fetch_and_and(%d,%d) = %d\n", contatore_prod, C, __sync_fetch_and_add(&contatore_prod, C));
+		printf("tid = %lu contatore incrementato: %d\n",pthread_self(), contatore_prod);
 		release();
-		printf("tid=%lu; sono il thread figlio e ho appena rilasciato il lock\n", pthread_self());
 	}
 
 	pthread_exit(0);
