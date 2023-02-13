@@ -18,9 +18,9 @@ Il processo padre termina solo dopo che il thread figlio ha terminato
 
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 
-void* child_func(void* retval){
+void* child_func(void* arg){
 	char* message;
-	message = (char*)retval;
+	message = (char*)arg;
 	printf("Sono il thread figlio, tid = %lu\n", pthread_self());
 	printf("Procedo a stampare la stringa: %s\n", message);
 	pthread_exit(0);

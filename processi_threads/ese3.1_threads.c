@@ -20,33 +20,25 @@ della coda.
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <semaphore.h>
 #include <time.h>
 #include "queue.h"  				//la coda è implementata tramite array di interi e può contenere 128 elementi
 
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
 
-#define P 2
-#define C 10
-#define SECONDS 10
-#define QUEUE_LENGTH 128
+#define P 20
+#define C 20
+#define SECONDS 5
+#define QUEUE_LENGTH 64
 
 QUEUE* coda;
-pthread_mutex_t pmutex;
 pthread_barrier_t pbarrier;
-//srand(time(NULL));
-volatile unsigned contatore_prod = 0;
+pthread_mutex_t pmutex;
+sem_t fase;
 
 void* prod_enqueue(void* arg);
 void* cons_dequeue(void* arg);
-void acquire(){
-	pthread_mutex_lock(&pmutex);
-	printf("tid = %lu lock acquisito\n", pthread_self());
-}
-void release(){
-	pthread_mutex_unlock(&pmutex);
-	printf("tid = %lu lock rilasciato\n", pthread_self());
-}
 
 int main(int argc, char* argv[]){
 	/*creo una coda vuota*/
@@ -58,53 +50,112 @@ int main(int argc, char* argv[]){
 
 	pthread_t prod[P];
 	pthread_t cons[C];
-	pthread_mutex_init(&pmutex, NULL);
 
 	int prod_creati = 0, cons_creati = 0; 			//variabili booleane per creare thread
+	while(1)
+	{
+		int conta_creati = 0, conta_estratti = 0;
 
-	//while(1)
-	//{
 		/*prima fase*/
-		printf("Inizio della prima fase, procedo a creare i thread produttori\n");
+		printf("\n___________________________\n");
+		printf("\n\nInizio della prima fase\n\n");
 		pthread_barrier_init(&pbarrier, NULL, P);
+		pthread_mutex_init(&pmutex, NULL);
+		//sem_init(&fase,0,1);
 		if(!prod_creati){
 			for(int i = 0; i < P; i++) {
-				int res = pthread_create(prod + i, NULL, prod_enqueue, NULL);
+				int res = pthread_create(prod + i, NULL, prod_enqueue, (void*)&conta_creati);
 				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
 			}
 			prod_creati = 1;
 		}
 
-		sleep(SECONDS);
-
+		/*terminazione dei thred produttori*/
 		for(int i = 0; i < P; i++){
 			int res = pthread_join(prod[i], NULL);
 			if(res != 0) abort_arg("errore nella terminazione dei thread, errore = %d\n",res);
 			prod_creati = 0;
 		}
+		//sem_wait(&fase);
+		pthread_barrier_destroy(&pbarrier);
+		pthread_mutex_destroy(&pmutex);
+		if(isEmpty(coda)) printf("La coda è vuota\n");
+		else stampa(coda);
+		sleep(SECONDS);
+
+
+		/*seconda fase*/
+		printf("\n_____________________________\n");
+		printf("\n\nInizio della seconda fase\n\n");
+
+		pthread_barrier_init(&pbarrier, NULL, C);
+		pthread_mutex_init(&pmutex, NULL);
+		//sem_post(&fase);
+		if(!cons_creati){
+			for(int i = 0; i < C; i++) {
+				int res = pthread_create(cons + i, NULL, cons_dequeue, (void*)&conta_estratti);
+				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
+			}
+			cons_creati = 1;
+		}
+
+		/*terminazione thread consumatori*/
+		for(int i = 0; i < C; i++){
+			int res = pthread_join(cons[i], NULL);
+			if(res != 0) abort_arg("errore nella terminazione dei thread, errore = %d\n",res);
+			cons_creati = 0;
+		}
 
 		pthread_barrier_destroy(&pbarrier);
+		pthread_mutex_destroy(&pmutex);
+		if(isEmpty(coda)) printf("La coda è vuota\n");
+		else stampa(coda);
+		//sem_destroy(&fase);
+		sleep(SECONDS);
+	}
+}
 
-		for(int i = 0; i < QUEUE_LENGTH; i++) printf("intero pos.%d = %d\n",i, coda->elementi[i]);
-	//}
+void* cons_dequeue(void* arg){
+	printf("tid = %lu in attesa della barrier\n",pthread_self());
+	pthread_barrier_wait(&pbarrier);				//aspetto che tutti i thread vengano creati
+	volatile int* i = (int*)arg;
+	while(1){
+		int random = rand() % 100 + 1;
+		printf("tid = %lu in attesa del lock\n", pthread_self());
+		//sem_wait(&lock);
+		pthread_mutex_lock(&pmutex);
+		if(*i < C){
+			int x = dequeue(coda);
+			__sync_fetch_and_add(i, 1);
+			printf("tid = %lu ho estratto dalla coda il numero %d, iterazione i = %d\n", pthread_self(), x, *i);
+			pthread_mutex_unlock(&pmutex);
+		}else {
+			pthread_mutex_unlock(&pmutex);
+			break;
+		}
+	}
+	pthread_exit(0);
 }
 
 void* prod_enqueue(void* arg){
-
 	printf("tid = %lu in attesa della barrier\n",pthread_self());
-	pthread_barrier_wait(&pbarrier);
-	
-	while(contatore_prod < C){
-		int random = rand() % 1000 + 1;
-		printf("tid = %lu in attesa del lock\n", pthread_self());
-		acquire();
-		enqueue(coda, random);
-		printf("tid = %lu ho messo in coda il numero %d\n", pthread_self(), random);
-		__sync_fetch_and_add(&contatore_prod, 1);
-		printf("__sync_fetch_and_and(%d,%d) = %d\n", contatore_prod, C, __sync_fetch_and_add(&contatore_prod, C));
-		printf("tid = %lu contatore incrementato: %d\n",pthread_self(), contatore_prod);
-		release();
-	}
+	pthread_barrier_wait(&pbarrier);				//aspetto che tutti i thread vengano creati
+	volatile int* i = (int*)arg;
 
+	while(1){
+		int random = rand() % 100 + 1;
+		printf("tid = %lu in attesa del lock\n", pthread_self());
+		//sem_wait(&lock);
+		pthread_mutex_lock(&pmutex);
+		if(*i < C){
+			enqueue(coda, random);
+			__sync_fetch_and_add(i, 1);
+			printf("tid = %lu ho messo in coda il numero %d, iterazione i = %d\n", pthread_self(), random, *i);
+			pthread_mutex_unlock(&pmutex);
+		}else {
+			pthread_mutex_unlock(&pmutex);
+			break;
+		}
+	}
 	pthread_exit(0);
 }

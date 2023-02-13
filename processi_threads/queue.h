@@ -12,5 +12,6 @@ void enqueue(QUEUE* coda, int x);
 int dequeue(QUEUE* coda);
 int isEmpty(QUEUE* coda);
 void emptyQueue(QUEUE* coda);
+void stampa(QUEUE* coda);
 
 #endif

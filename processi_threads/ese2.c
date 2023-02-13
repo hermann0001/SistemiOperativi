@@ -28,7 +28,6 @@ int main(int argc, char* argv[]){
 
 	scanf("%[^\n]%*c", buffer);
 
-
 	int taglia = strlen(buffer);
 
 	printf("sono il parent e sto per creare il primo figlio! pid = %d\n", getpid());

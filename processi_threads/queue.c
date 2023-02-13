@@ -4,8 +4,8 @@
 
 QUEUE* new_queue(){
 	QUEUE* c = (QUEUE*)malloc(sizeof(QUEUE));
-	c->length = 128;
-	c->elementi = (int*) malloc(sizeof(int));
+	c->length = 64;
+	c->elementi = (int*)calloc(c->length, sizeof(int));
 	c->head = 0;
 	c->tail = 0;
 	return c;
@@ -44,4 +44,10 @@ int isEmpty(QUEUE* coda){
 
 void emptyQueue(QUEUE* coda){
 	coda->head = coda->tail = 0;
+}
+
+void stampa(QUEUE* coda){
+	for(int i = coda->head; i <= coda->tail; i++){
+		printf("elemento in pos. %d: %d\n",i, coda->elementi[i]);
+	}
 }
