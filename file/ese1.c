@@ -18,7 +18,6 @@ utilizza il dispositivo /dev/random come sorgente di numeri pseudo-casuali.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <errno.h>
 
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
