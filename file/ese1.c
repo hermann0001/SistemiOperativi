@@ -22,6 +22,7 @@ utilizza il dispositivo /dev/random come sorgente di numeri pseudo-casuali.
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
 #define URANDOM "/dev/urandom"
+#define RANDOM  "/dev/random"
 
 int main(int argc, char* argv[]){
 	if(argc != 3) abort("usage: <nomeprogramma> <intero N> <stringa S>\n");
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]){
 	int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0660);
 	int input_fd  = open(URANDOM, O_RDONLY, 0660);
 	if(output_fd == -1) abort_arg("errore nell'apertura del file %s\n", argv[2]);
-	if(input_fd == -1) abort_arg("errore nell'apertura del file %s\n", URANDOM);
+	if(input_fd == -1) abort_arg("errore nell'apertura del file %s\n", RANDOM);
 
 	//scrivo su output e leggo da input
 	size_r = read(input_fd, buffer, n);

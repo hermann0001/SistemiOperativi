@@ -120,7 +120,6 @@ void* cons_dequeue(void* arg){
 	pthread_barrier_wait(&pbarrier);				//aspetto che tutti i thread vengano creati
 	volatile int* i = (int*)arg;
 	while(1){
-		int random = rand() % 100 + 1;
 		printf("tid = %lu in attesa del lock\n", pthread_self());
 		//sem_wait(&lock);
 		pthread_mutex_lock(&pmutex);
