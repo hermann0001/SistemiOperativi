@@ -73,15 +73,15 @@ int main(int argc, char* argv[]){
 	}
 	 
 
-/*
+
 	pthread_barrier_init(&(pt->barrier));
 	pthread_mutex_init(&(pt->mutex));
 	for(int i = 0; i < N; i++) pthread_create(ctid + i, NULL, leggi_int, (void*)pt);
 
-	for(int i = 0; i < N; i++) pthread_join(ctid[i], NULL);*/
+	for(int i = 0; i < N; i++) pthread_join(ctid[i], NULL);
 
 }
-/*
+
 void * leggi_int(void* arg){
 	LOCKS* pt = (LOCKS*)arg		//passo come parametro i locks
 	short* buffer = (short*)malloc(sizeof(short)*BUFSIZE);
@@ -98,16 +98,6 @@ void * leggi_int(void* arg){
 				if(buffer[i] > max)
 					__sync_val_compare_and_swap(&max, max, buffer[i]);  //comparando &max e max otterrò sempre lo swap
 			}
-
-		}
-		__sync_bool_compare_and_swap(&stop, 0, 1);
 		pthread_mutex_unlock	
-
-
-
 	}
-
-
-
 }
-*/
