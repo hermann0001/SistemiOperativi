@@ -32,7 +32,7 @@ int main(int argc, char* argv[]){
 	char* buffer[n];
 
 	int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0660);
-	int input_fd  = open(URANDOM, O_RDONLY, 0660);
+	int input_fd  = open(URANDOM, O_RDONLY);
 	if(output_fd == -1) abort_arg("errore nell'apertura del file %s\n", argv[2]);
 	if(input_fd == -1) abort_arg("errore nell'apertura del file %s\n", RANDOM);
 
