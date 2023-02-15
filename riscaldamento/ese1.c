@@ -8,19 +8,17 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main(void){
 
-	char* stringa_heap = malloc(sizeof(char));
-	int taglia = 0;  
+	char* stringa_heap = malloc(256);  
 
 	printf("Scrivi una stringa di caratteri\n");
-	scanf("%ms %*s", &stringa_heap);
+	scanf("%s%*c", stringa_heap);
 
-	while(stringa_heap[taglia++] != '\0');
-
-	for(int i = 0; i < taglia; i++)
-		stringa_stack[i] = stringa_heap[i];
+	char stringa_stack[strlen(stringa_heap)];
+	for(int i = 0; stringa_heap[i] != '\0'; i++) stringa_stack[i] = stringa_heap[i];
 
 	free(stringa_heap);
 

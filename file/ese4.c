@@ -71,7 +71,6 @@ void tunnel(int descriptors[], int count){
 	free(ctid);
 }
 
-//prende da terminale N filename da ridirezionare
 int main(int argc, char* argv[]){
 	if(argc < 1) abort("too few arguments, insert at least 1 filename\n");
 
