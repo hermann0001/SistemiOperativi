@@ -17,13 +17,40 @@ Il file è tale per cui, ciascuna stringa è lunga 50 caratteri incluso il termi
 #define abort(msg) do{printf(msg), exit(1);}while(0);
 #define FILENAME "stringset.txt"
 #define CHARSET "abde"
+#define BUFSIZE 2000
+#define LENGTH 50
 
 int fd = 0;
 unsigned count;
 
+int isSubset(char* string, char* set){w
+	int found = 0;
+	for(int i = 0; string[i] != '\0'; i++){
+		int j = 0;
+		while(!found && set[j] != '\0'){
+			found = string[i] == set[j];
+			j++;
+		}
+	}
+	return found;
+}
+
 void* child_func(void* arg){
 	char* charset = (char*)arg;
-	printf("fd = %d, charset = %s\n",fd,charset);
+
+	char* buffer = (char*)malloc(BUFSIZE);
+
+	ssize_t size_r;
+	do{
+		size_r = read(fd, buffer, BUFSIZE);
+		if(size_r == -1) abort("error on reading");
+
+		for(int i = 0; i < LENGTH; i++){
+			is_subset(buffer, CHARSET);
+
+		}
+
+	}while(size_r > 0)
 
 }
 

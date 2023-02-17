@@ -32,8 +32,7 @@ int main(int argc, char* argv[]){
 	scanf("%[^\n]%*c", buffer);
 
 	pthread_t ctid;
-	int child; //*status_ptr, status_val;
-	//status_ptr = &status_val;
+	int child;
 
 	printf("sto per creare un thread, tid = %lu\n", pthread_self());
 	child = pthread_create(&ctid, NULL,child_func, (void*)buffer);

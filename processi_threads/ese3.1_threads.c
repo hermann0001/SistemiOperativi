@@ -64,7 +64,7 @@ int main(int argc, char* argv[]){
 		//sem_init(&fase,0,1);
 		if(!prod_creati){
 			for(int i = 0; i < P; i++) {
-				int res = pthread_create(prod + i, NULL, prod_enqueue, (void*)&conta_creati);
+				int res = pthread_create(prod + i, NULL, prod_enqueue, &conta_creati);
 				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
 			}
 			prod_creati = 1;
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]){
 		//sem_post(&fase);
 		if(!cons_creati){
 			for(int i = 0; i < C; i++) {
-				int res = pthread_create(cons + i, NULL, cons_dequeue, (void*)&conta_estratti);
+				int res = pthread_create(cons + i, NULL, cons_dequeue, &conta_estratti);
 				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
 			}
 			cons_creati = 1;
@@ -117,15 +117,16 @@ int main(int argc, char* argv[]){
 
 void* cons_dequeue(void* arg){
 	printf("tid = %lu in attesa della barrier\n",pthread_self());
-	pthread_barrier_wait(&pbarrier);				//aspetto che tutti i thread vengano creati
-	volatile int* i = (int*)arg;
+	//aspetto che tutti i thread vengano creati
+	pthread_barrier_wait(&pbarrier);				
+	int i = *(int*)arg;
 	while(1){
 		printf("tid = %lu in attesa del lock\n", pthread_self());
 		//sem_wait(&lock);
 		pthread_mutex_lock(&pmutex);
-		if(*i < C){
+		if(i < C){
 			int x = dequeue(coda);
-			__sync_fetch_and_add(i, 1);
+			__sync_fetch_and_add(&i, 1);
 			printf("tid = %lu ho estratto dalla coda il numero %d, iterazione i = %d\n", pthread_self(), x, *i);
 			pthread_mutex_unlock(&pmutex);
 		}else {
