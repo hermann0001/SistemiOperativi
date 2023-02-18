@@ -59,6 +59,7 @@ typedef struct t{
 }THREAD_DATA;
 
 sem_t sem[2];
+size_t total_bytes;
 
 
 ssize_t head_write(int fd, const void* buffer, size_t size){
@@ -84,7 +85,8 @@ ssize_t head_write(int fd, const void* buffer, size_t size){
 
 	//write the string at the beginning and write all file back
 	lseek(fd, 0, SEEK_SET);
-	if(write(fd, buffer, size) == -1) abort("error on writing string\n");
+	ssize_t string_size = write(fd, buffer, size);
+	if(string_size == -1) abort("error on writing string\n");
 
 	//put new line
 	write(fd, "\n", 1);
@@ -97,25 +99,29 @@ ssize_t head_write(int fd, const void* buffer, size_t size){
 	}
 
 	free(tmp);
-	return size_w + size;
+	return string_size;
 }
 
 void* child_func(void* arg){
 	//th referes to th[0] if im T1 or refers to th[1] if i'm T2
 	THREAD_DATA th = *(THREAD_DATA*)arg;
 	char* input_string;
-
+	int res = 0;
 	while(1){
 		sem_wait(&sem[th.id]);
-		printf("sono thread %d e ho la scanf\n",th.id + 1);
-		scanf("%ms", &input_string);
+		printf("i'm thread %d, press CTRL+D to stop\n",th.id + 1);
+		res = scanf("%ms", &input_string);
 		sem_post(&sem[(th.id+1)%2]);
+		if(res < 0) pthread_exit(NULL);
 		size_t taglia = strlen(input_string);
 
 		//execute write func
 		ssize_t size_w = th.write_func(th.fd, input_string, taglia);
-		//check if T1 calls a simple write goes on error
+		//check if T1 simple goes on error
 		if(size_w == -1) abort("error writing new string\n");
+
+		//increase total bytes counter
+		__sync_fetch_and_add(&total_bytes, size_w);
 
 		//put a new line character at the end
 		if(write(th.fd, "\n", 1) == -1) abort("error on writing new line character\n");
@@ -129,10 +135,11 @@ void* child_func(void* arg){
 
 
 int main(int argc, char* argv[]){
-	if(argc != 3) abort("usage: 230207 <fileA> <fileB>\n");
+	if(argc != 3) abort("usage: 230207 <tail> <head>\n");
 
 	pthread_t ctid[2];
 	THREAD_DATA* th = (THREAD_DATA*)malloc(sizeof(THREAD_DATA) * 2);
+	total_bytes = 0;
 
 	//open file A for T1
 	th[0].fd = open(argv[1], O_WRONLY | O_CREAT | O_APPEND, 0660);
@@ -155,6 +162,8 @@ int main(int argc, char* argv[]){
 
 	//wait for threads to finish
 	for(int i = 0; i < 2; i++) pthread_join(ctid[i], NULL);
+
+	printf("total bytes written: %ld\n", total_bytes);
 	
 	//close file descriptors
 	for(int i = 0; i < 2; i++) close(th[0].fd);
