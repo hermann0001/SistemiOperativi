@@ -48,7 +48,6 @@ volatile short min = SHRT_MAX;
 volatile short max = SHRT_MIN;
 int fd;
 
-
 void* leggi_int(void* arg);
 
 int main(int argc, char* argv[]){
