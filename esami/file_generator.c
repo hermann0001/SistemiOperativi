@@ -6,13 +6,13 @@
 #include <sys/types.h>
 
 #define POTENTIAL_SIZE 150000
-#define FILE_COUNT 1
+#define FILE_COUNT 4
 
 int main(){
 
 	for(int i = 0; i < FILE_COUNT; i++){
-		char filename[] = "palindrome";
-		//filename[5] = (i + 1) + '0';
+		char filename[] = "prova .txt";
+		filename[5] = (i + 1) + '0';
 
 		int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0660);
 		//char* characters = malloc(POTENTIAL_SIZE);
@@ -20,15 +20,13 @@ int main(){
 		//ssize_t size_r = 0;
 		//read(random, characters, POTENTIAL_SIZE);
 
-		char palindrome[49]     = "abcdabcdabcdabcdabcdabcdedcbadcbadcbadcbadcbadcba";
-		char not_palindrome[49] = "zxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcv";
+		char string[49]     = "ciaociaociaociaociaociaociaociaociaociaociaociaoc";
+		//char not_palindrome[49] = "zxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcvbzxcv";
 
-		for(int i = 0; i < 8000; i++){
-			/*if(characters[i] >= 32 && characters[i] <= 126 && characters[i] == 'c')*/
-				write(fd, palindrome, 49);
-				write(fd, "\0", 1);
-				write(fd, not_palindrome,49);
-				write(fd, "\0", 1);
+		for(int i = 0; i < 10; i++){
+			write(fd, string, 49);
+			write(fd, "\n", 1);
 		}
+		close(fd);
 	}
 }
