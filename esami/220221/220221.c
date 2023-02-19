@@ -72,8 +72,6 @@ void* child_func(void* arg){
 	ssize_t size_r = read(th.fd, buffer, LENGTH * my_strings);
 	if(size_r == -1) abort("error on reading\n");
 
-
-
 	for(int i = 0; i < my_strings; i++)
 		__sync_fetch_and_add(&count, is_subset(buffer + (i * LENGTH), charset_global));
 }
