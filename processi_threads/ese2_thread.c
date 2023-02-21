@@ -35,8 +35,8 @@ int main(int argc, char* argv[]){
 
 	printf("tid = %lu, sono il parent e sto per generare due thread figli\n", pthread_self());
 
-	int child1 = pthread_create(&ctid1, NULL, child_func, (void*)buffer);
-	int child2 = pthread_create(&ctid2, NULL, child_func, (void*)buffer);
+	int child1 = pthread_create(&ctid1, NULL, child_func, buffer);
+	int child2 = pthread_create(&ctid2, NULL, child_func, buffer);
 
 	if(child1 != 0) abort("errore nella creazione del primo thread\n");
 	if(child2 != 0) abort("errore nella creazione del secondo thread\n");
@@ -49,8 +49,8 @@ int main(int argc, char* argv[]){
 	exit(0);
 }
 
-void* child_func(void* buffer){
-	char* stringa = (char*)buffer;
+void* child_func(void* arg){
+	char* stringa = (char*)arg;
 	int taglia = strlen(stringa);
 	for(int i = 0; i < taglia/2; i++){
 		stringa[i] ^= stringa[taglia-1-i];

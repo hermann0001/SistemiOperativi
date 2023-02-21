@@ -17,77 +17,85 @@ tramite il parametro file_name, e stampi la stringa su standard output in caso a
 
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
+#define BUFSIZE 1024
 
 pthread_mutex_t ptmutex;
-off_t filesize;
+
+typedef struct t{
+	int fd;
+	int index;
+}THREAD_DATA;
 
 void* child_func(void* arg){
-	int fd = *(int*)arg;
+	THREAD_DATA* th = (THREAD_DATA*)arg;
 	ssize_t size_r;
-	char* input_string = malloc(filesize);		//input_string cant be more than file size
-
-
-	//read string from stdin
-	pthread_mutex_lock(&ptmutex);
-	printf("tid = %lu, inserisci la stringa: ",pthread_self());
-	scanf("%s", input_string);
-	printf("stringa: %s\n",input_string);
-	pthread_mutex_unlock(&ptmutex);
-
-	int size_string = strlen(input_string);
-
-	char* buffer = malloc(size_string);
-
-	off_t offset = 1;
+	char* input_string;
 	int found = 0;
 
 	pthread_mutex_lock(&ptmutex);
-	lseek(fd, 0, SEEK_SET);							//replace file index if other threads moved it
+	//read string from stdin
+	printf("tid = %d, inserisci la stringa: ",th->index);
+	scanf("%ms%*c", &input_string);
+	pthread_mutex_unlock(&ptmutex);
+
+	char* buffer = malloc(BUFSIZE);
+
 	//read the file and search for matches
 	do{
 		//read from file exact n. bytes as input_string
-		size_r = read(fd, buffer, size_string);  
+		size_r = read(th->fd, buffer, BUFSIZE);  
 		if(size_r == -1) abort("error on reading file\n");
 
 		//compare the string
-		if(strcmp(input_string, buffer) == 0){
+		if(strstr(buffer, input_string)){
 			//if they're equals, set found to 1 and print the string
 			found = 1;
-			printf("tid = %lu found the match: s1 = %s, s2 = %s\n",pthread_self(), input_string, buffer);
+			pthread_mutex_lock(&ptmutex);
+			printf("tid = %d found the match with %s!\n", th->index, input_string);
+			pthread_mutex_unlock(&ptmutex);
 		}
-		else
-			lseek(fd, offset++, SEEK_SET);	//if no match was found, the file index is replaced by an offset of 1
-	}while((!found) && (size_r >= size_string));
-	pthread_mutex_unlock(&ptmutex);
+		else 
+		{
+			//riposiziona l'indice di strlen(input_string)-1 dalla fine dell'ultima lettura (l'ultima lettura potrebbe aver tagliato la stringa)
+			off_t indice = lseek(th->fd, 0, SEEK_CUR);
+			lseek(th->fd, indice - (strlen(input_string) - 1), SEEK_SET);
+		}
+	}while((!found) && size_r > 0);
 
-	free(buffer);
 	free(input_string);
+	free(buffer);
 	pthread_exit(NULL);
 }
 
 void file_check(char* file_name, int num_threads){
+	if(num_threads < 1) num_threads = 1;
 
+	pthread_mutex_init(&ptmutex, NULL);
+	
 	//allocate the threads
 	pthread_t* ctid = (pthread_t*)malloc(sizeof(pthread_t) * num_threads);
-	pthread_mutex_init(&ptmutex, NULL);
+	THREAD_DATA* th = (THREAD_DATA*)malloc(sizeof(THREAD_DATA) * num_threads);
 
-	//opening the file
-	int fd = open(file_name, O_RDONLY);
-	if(fd == -1) abort("error opening file\n");
+	for(int i = 0; i < num_threads; i++){
+		th[i].fd = open(file_name, O_RDONLY);
+		if(th[i].fd == -1) abort("error opening file\n");
+		th[i].index = i;
+	}
 
-	//compute filesize
-	filesize = lseek(fd, 0, SEEK_END);
-	lseek(fd, 0, SEEK_SET);
-
-	//creating threads, descriptor as argument
-	for(int i = 0; i < num_threads; i++) pthread_create(ctid + i, NULL, child_func, &fd);
+	//creating threads
+	for(int i = 0; i < num_threads; i++) 
+		pthread_create(ctid + i, NULL, child_func, th + i);
 
 	//destroying threads
-	for(int i = 0; i < num_threads; i++) pthread_join(ctid[i], NULL);
+	for(int i = 0; i < num_threads; i++) 
+		pthread_join(ctid[i], NULL);
+
+	for(int i = 0; i < num_threads; i++)
+		close(th[i].fd);
 
 	pthread_mutex_destroy(&ptmutex);
-	close(fd);
 	free(ctid);
+	free(th);
 }
 
 int main(int argc, char* argv[]){

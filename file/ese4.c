@@ -17,11 +17,8 @@ concorrente per i diversi canali.
 #include <pthread.h>
 
 #define STDOUT 1
-#define BUFSIZE
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
-
-pthread_mutex_t ptmutex;
 
 void* child_func(void* arg){
 	int fd = *(int*)arg;		//file descriptor
@@ -43,13 +40,11 @@ void* child_func(void* arg){
 		//has EOF reached?
 		end = size_r == 0;
 
-		pthread_mutex_lock(&ptmutex);
 		//write to stdout
 		size_w = write(STDOUT, buffer + size_w, size_r);
 		if(size_w == -1) abort("error on writing\n");
 
 		if(size_w != size_r) printf("not all bytes were written!\n");
-		pthread_mutex_unlock(&ptmutex);
 	}
 	free(buffer);
 
@@ -58,7 +53,6 @@ void* child_func(void* arg){
 
 void tunnel(int descriptors[], int count){
 	pthread_t* ctid = (pthread_t*)malloc(sizeof(pthread_t) * count);
-	pthread_mutex_init(&ptmutex, NULL);
 
 	//creatig the threads
 	for(int i = 0; i < count; i++) pthread_create(ctid + i, NULL, child_func, &descriptors[i]);
@@ -66,13 +60,12 @@ void tunnel(int descriptors[], int count){
 	//destroying the threads
 	for(int i = 0; i < count; i++) pthread_join(ctid[i], NULL);
 
-	pthread_mutex_destroy(&ptmutex);
 
 	free(ctid);
 }
 
 int main(int argc, char* argv[]){
-	if(argc < 1) abort("too few arguments, insert at least 1 filename\n");
+	if(argc < 1) abort("too few arguments, insert at least 1 file\n");
 
 	int count = argc - 1;
 	char* filenames[count];
