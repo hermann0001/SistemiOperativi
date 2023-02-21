@@ -27,135 +27,148 @@ della coda.
 #define abort(msg) do{printf(msg); exit(1);}while(0)
 #define abort_arg(msg, arg) do{printf(msg,arg); exit(1);}while(0)
 
-#define P 20
-#define C 20
+#define P 2
+#define C 2
 #define SECONDS 5
 #define QUEUE_LENGTH 64
+#define THREAD_SHARED 0
+#define NUM_FASI 4
 
 QUEUE* coda;
+
+typedef struct t{
+	int index;
+	int* counter;			//counter for operations, if it's P it refers to enqueues, if it's consumer it refers to deuques
+}THREAD_DATA;
+
+sem_t cmut, pmut;
+sem_t first_phase, second_phase;
+sem_t cons_order[C];
+//sem = 0 -> block; sem > 0 -> go!
+
+pthread_barrier_t cbarrier;
 pthread_barrier_t pbarrier;
-pthread_mutex_t pmutex;
-sem_t fase;
 
 void* prod_enqueue(void* arg);
 void* cons_dequeue(void* arg);
 
-int main(int argc, char* argv[]){
+int main(){
 	/*creo una coda vuota*/
-
-	if(argc != 1) abort("usage: <nome programma>");
-
 	coda = new_queue();
 	emptyQueue(coda);
 
-	pthread_t prod[P];
-	pthread_t cons[C];
+	pthread_t* prod = (pthread_t*)malloc(sizeof(pthread_t) * P);
+	pthread_t* cons = (pthread_t*)malloc(sizeof(pthread_t) * C);
+	THREAD_DATA* prod_data = (THREAD_DATA*)malloc(sizeof(THREAD_DATA) * P);
+	THREAD_DATA* cons_data = (THREAD_DATA*)malloc(sizeof(THREAD_DATA) * C);
+	
+	int conta_creati = 0, conta_estratti = 0;
 
-	int prod_creati = 0, cons_creati = 0; 			//variabili booleane per creare thread
-	while(1)
-	{
-		int conta_creati = 0, conta_estratti = 0;
+	sem_init(&cmut, THREAD_SHARED, 1);
+	sem_init(&pmut, THREAD_SHARED, 1);
+	sem_init(&first_phase, THREAD_SHARED, C);
+	sem_init(&second_phase, THREAD_SHARED, 0);
 
-		/*prima fase*/
-		printf("\n___________________________\n");
-		printf("\n\nInizio della prima fase\n\n");
-		pthread_barrier_init(&pbarrier, NULL, P);
-		pthread_mutex_init(&pmutex, NULL);
-		//sem_init(&fase,0,1);
-		if(!prod_creati){
-			for(int i = 0; i < P; i++) {
-				int res = pthread_create(prod + i, NULL, prod_enqueue, &conta_creati);
-				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
-			}
-			prod_creati = 1;
-		}
+	pthread_barrier_init(&pbarrier, NULL, P);
+	pthread_barrier_init(&cbarrier, NULL, P);
 
-		/*terminazione dei thred produttori*/
-		for(int i = 0; i < P; i++){
-			int res = pthread_join(prod[i], NULL);
-			if(res != 0) abort_arg("errore nella terminazione dei thread, errore = %d\n",res);
-			prod_creati = 0;
-		}
-		//sem_wait(&fase);
-		pthread_barrier_destroy(&pbarrier);
-		pthread_mutex_destroy(&pmutex);
-		if(isEmpty(coda)) printf("La coda è vuota\n");
-		else stampa(coda);
-		sleep(SECONDS);
-
-
-		/*seconda fase*/
-		printf("\n_____________________________\n");
-		printf("\n\nInizio della seconda fase\n\n");
-
-		pthread_barrier_init(&pbarrier, NULL, C);
-		pthread_mutex_init(&pmutex, NULL);
-		//sem_post(&fase);
-		if(!cons_creati){
-			for(int i = 0; i < C; i++) {
-				int res = pthread_create(cons + i, NULL, cons_dequeue, &conta_estratti);
-				if(res != 0) abort_arg("errore nella creazione del thread, errore = %d\n",res);
-			}
-			cons_creati = 1;
-		}
-
-		/*terminazione thread consumatori*/
-		for(int i = 0; i < C; i++){
-			int res = pthread_join(cons[i], NULL);
-			if(res != 0) abort_arg("errore nella terminazione dei thread, errore = %d\n",res);
-			cons_creati = 0;
-		}
-
-		pthread_barrier_destroy(&pbarrier);
-		pthread_mutex_destroy(&pmutex);
-		if(isEmpty(coda)) printf("La coda è vuota\n");
-		else stampa(coda);
-		//sem_destroy(&fase);
-		sleep(SECONDS);
+	//init for producers
+	for(int i = 0; i < P; i++){
+		prod_data[i].index = i+1;
+		prod_data[i].counter = &conta_creati;
 	}
-}
 
-void* cons_dequeue(void* arg){
-	printf("tid = %lu in attesa della barrier\n",pthread_self());
-	//aspetto che tutti i thread vengano creati
-	pthread_barrier_wait(&pbarrier);				
-	int i = *(int*)arg;
-	while(1){
-		printf("tid = %lu in attesa del lock\n", pthread_self());
-		//sem_wait(&lock);
-		pthread_mutex_lock(&pmutex);
-		if(i < C){
-			int x = dequeue(coda);
-			__sync_fetch_and_add(&i, 1);
-			printf("tid = %lu ho estratto dalla coda il numero %d, iterazione i = %d\n", pthread_self(), x, *i);
-			pthread_mutex_unlock(&pmutex);
-		}else {
-			pthread_mutex_unlock(&pmutex);
-			break;
-		}
+	//init for consumers
+	for(int i = 0; i < C; i++){
+		cons_data[i].index = i+1;
+		cons_data[i].counter = &conta_estratti;
+		sem_init(cons_order + i, THREAD_SHARED, (i == 0));			//only first cons has sem init to 1
+		printf("sem no. %d inited with %d\n", i, i==0);
 	}
-	pthread_exit(0);
+
+	/*creazione thread produttori*/
+	for(int i = 0; i < P; i++)
+		pthread_create(prod + i, NULL, prod_enqueue, prod_data + i);	
+
+
+	/*creazione thread consumatori*/
+	for(int i = 0; i < C; i++)
+		pthread_create(cons + i, NULL, cons_dequeue, cons_data + i);
+
+
+	/*terminazione dei thread produttori*/
+	for(int i = 0; i < P; i++)
+		pthread_join(prod[i], NULL);
+	
+	/*terminazione thread consumatori*/
+	for(int i = 0; i < C; i++)
+		pthread_join(cons[i], NULL);
+
+	sem_destroy(&first_phase); sem_destroy(&second_phase);
+	sem_destroy(&pmut); sem_destroy(&cmut);
+
+	pthread_barrier_destroy(&pbarrier);
+	pthread_barrier_destroy(&cbarrier);
+
+	free(prod_data); free(prod);
+	free(cons_data); free(cons);
 }
 
 void* prod_enqueue(void* arg){
-	printf("tid = %lu in attesa della barrier\n",pthread_self());
-	pthread_barrier_wait(&pbarrier);				//aspetto che tutti i thread vengano creati
-	volatile int* i = (int*)arg;
+	THREAD_DATA* th = (THREAD_DATA*)arg;
+	pthread_barrier_wait(&pbarrier);
 
-	while(1){
-		int random = rand() % 100 + 1;
-		printf("tid = %lu in attesa del lock\n", pthread_self());
-		//sem_wait(&lock);
-		pthread_mutex_lock(&pmutex);
-		if(*i < C){
-			enqueue(coda, random);
-			__sync_fetch_and_add(i, 1);
-			printf("tid = %lu ho messo in coda il numero %d, iterazione i = %d\n", pthread_self(), random, *i);
-			pthread_mutex_unlock(&pmutex);
-		}else {
-			pthread_mutex_unlock(&pmutex);
-			break;
+	int i = 0;
+	while(i < NUM_FASI){
+		sem_wait(&first_phase);
+		sem_wait(&pmut);			//producer mutual exclusion
+		//START C.S
+		int x = rand() % 50;
+		enqueue(coda, x);
+		printf("P%d, produced value: %d\n", th->index, x);
+		__sync_fetch_and_add(th->counter, 1);
+		if(*(th->counter) == C){
+			printf("let consumer phase begin\n");
+			for(int i = 0; i < C; i++)
+				sem_post(&second_phase);	//second phase can begin
+			__sync_bool_compare_and_swap(th->counter, *(th->counter), 0);
 		}
+		//END C.S
+		sem_post(&pmut);			//producer mutual exclusion
+		i++;
 	}
 	pthread_exit(0);
 }
+
+void* cons_dequeue(void* arg){
+	THREAD_DATA* th = (THREAD_DATA*)arg;
+	pthread_barrier_wait(&cbarrier);
+
+	int i = 0;
+	while(i < NUM_FASI){
+		sem_wait(&second_phase);	//wait for first phase to finish
+		printf("C%d stuck here\n", th->index);
+		sem_wait(cons_order + (th->index - 1)); //wait for semaphore and index (t->index - 1)
+		printf("C%d decremented sem no. %d\n", th->index, th->index - 1);
+		sem_wait(&cmut);			//consumers mutual exclusion
+		//START C.S.
+		int x = dequeue(coda);
+		printf("C%d, consumed: %d\n",th->index, x);
+		__sync_fetch_and_add(th->counter, 1);
+		if(*(th->counter) == C){
+			printf("let producer phase begin\n");
+			for(int i = 0; i < P; i++)
+				sem_post(&first_phase);	//first phase can begin
+			__sync_bool_compare_and_swap(th->counter, *(th->counter), 0);
+		}
+		//END C.S.
+		sem_post(cons_order + (th->index  % C));
+		sem_post(&cmut);			//consumers mutual exclusion
+		printf("C%d incremented sem no. %d\n", th->index,th->index % C);
+		i++;
+	}
+	pthread_exit(0);
+}
+
+
+//not deterministic, it maybe work, maybe not...
